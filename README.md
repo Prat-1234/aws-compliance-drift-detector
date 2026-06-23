@@ -12,7 +12,7 @@
 This system continuously monitors your AWS account for compliance violations across 7 security rules. When a resource drifts out of compliance, it:
 
 1. **Detects** the violation via AWS Config + EventBridge
-2. **Analyzes** the risk using Amazon Bedrock (Nova Micro) AI
+2. **Analyzes** the risk using rule-based explanations (Amazon Bedrock Nova Micro integration built and wired — pending quota activation)
 3. **Stores** the violation in DynamoDB with severity classification
 4. **Alerts** via SNS email with AI-generated risk explanation
 5. **Auto-remediates** 3 critical violation types automatically
