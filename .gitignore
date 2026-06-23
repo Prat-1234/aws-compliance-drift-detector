@@ -1,0 +1,20 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform.lock.hcl
+
+# Test files
+test-event.json
+test-remediation.json
+response.json
+remediation-response.json
+ecr-token.txt
+
+# Docker
+*.tar
+
+# OS
+.DS_Store
+Thumbs.db

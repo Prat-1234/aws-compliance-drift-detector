@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AWS Compliance Drift Detector</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f1117;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: #1a1f2e;
+            border-bottom: 1px solid #2d3748;
+            padding: 1.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #63b3ed;
+        }
+
+        .header .subtitle {
+            font-size: 0.75rem;
+            color: #718096;
+            margin-top: 2px;
+        }
+
+        .refresh-btn {
+            background: #2b6cb0;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .refresh-btn:hover {
+            background: #2c5282;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: #1a1f2e;
+            border: 1px solid #2d3748;
+            border-radius: 8px;
+            padding: 1.25rem;
+            text-align: center;
+        }
+
+        .stat-val {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .val-high {
+            color: #fc8181;
+        }
+
+        .val-medium {
+            color: #f6ad55;
+        }
+
+        .val-low {
+            color: #68d391;
+        }
+
+        .val-total {
+            color: #63b3ed;
+        }
+
+        .val-remediated {
+            color: #68d391;
+        }
+
+        .filters {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid #2d3748;
+            background: #1a1f2e;
+            color: #a0aec0;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .filter-btn.active {
+            background: #2b6cb0;
+            border-color: #2b6cb0;
+            color: #fff;
+        }
+
+        .violations-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .violation-card {
+            background: #1a1f2e;
+            border: 1px solid #2d3748;
+            border-radius: 8px;
+            padding: 1.25rem;
+        }
+
+        .violation-card.HIGH {
+            border-left: 4px solid #fc8181;
+        }
+
+        .violation-card.MEDIUM {
+            border-left: 4px solid #f6ad55;
+        }
+
+        .violation-card.LOW {
+            border-left: 4px solid #68d391;
+        }
+
+        .v-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .v-rule {
+            font-size: 14px;
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+
+        .v-badges {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .badge-HIGH {
+            background: rgba(252, 129, 129, 0.15);
+            color: #fc8181;
+            border: 1px solid rgba(252, 129, 129, 0.3);
+        }
+
+        .badge-MEDIUM {
+            background: rgba(246, 173, 85, 0.15);
+            color: #f6ad55;
+            border: 1px solid rgba(246, 173, 85, 0.3);
+        }
+
+        .badge-LOW {
+            background: rgba(104, 211, 145, 0.15);
+            color: #68d391;
+            border: 1px solid rgba(104, 211, 145, 0.3);
+        }
+
+        .badge-REMEDIATED {
+            background: rgba(104, 211, 145, 0.15);
+            color: #68d391;
+            border: 1px solid rgba(104, 211, 145, 0.3);
+        }
+
+        .badge-PENDING {
+            background: rgba(246, 173, 85, 0.15);
+            color: #f6ad55;
+            border: 1px solid rgba(246, 173, 85, 0.3);
+        }
+
+        .badge-FAILED {
+            background: rgba(252, 129, 129, 0.15);
+            color: #fc8181;
+            border: 1px solid rgba(252, 129, 129, 0.3);
+        }
+
+        .v-resource {
+            font-size: 12px;
+            color: #718096;
+            margin-bottom: 8px;
+            font-family: monospace;
+        }
+
+        .v-ai {
+            font-size: 13px;
+            color: #a0aec0;
+            line-height: 1.6;
+            background: #0f1117;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            border-left: 3px solid #2d3748;
+        }
+
+        .v-ai-label {
+            font-size: 11px;
+            color: #4a5568;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+
+        .v-footer {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #4a5568;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .remediation-msg {
+            font-size: 12px;
+            color: #68d391;
+            margin-top: 6px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #718096;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 3rem;
+            color: #718096;
+        }
+
+        .error-msg {
+            background: rgba(252, 129, 129, 0.1);
+            border: 1px solid rgba(252, 129, 129, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            color: #fc8181;
+            margin-bottom: 1rem;
+            font-size: 13px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div>
+            <h1>AWS Compliance Drift Detector</h1>
+            <div class="subtitle">Real-time compliance monitoring powered by AWS Config + AI</div>
+        </div>
+        <button class="refresh-btn" onclick="loadViolations()">&#8635; Refresh</button>
+    </div>
+    <div class="container">
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-val val-total" id="stat-total">-</div>
+                <div class="stat-label">Total</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-val val-high" id="stat-high">-</div>
+                <div class="stat-label">High</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-val val-medium" id="stat-medium">-</div>
+                <div class="stat-label">Medium</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-val val-low" id="stat-low">-</div>
+                <div class="stat-label">Low</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-val val-remediated" id="stat-remediated">-</div>
+                <div class="stat-label">Remediated</div>
+            </div>
+        </div>
+        <div class="filters">
+            <button class="filter-btn active" onclick="setFilter('ALL', this)">All</button>
+            <button class="filter-btn" onclick="setFilter('HIGH', this)">High</button>
+            <button class="filter-btn" onclick="setFilter('MEDIUM', this)">Medium</button>
+            <button class="filter-btn" onclick="setFilter('LOW', this)">Low</button>
+            <button class="filter-btn" onclick="setFilter('REMEDIATED', this)">Remediated</button>
+        </div>
+        <div id="error-container"></div>
+        <div class="violations-list" id="violations-list">
+            <div class="loading">Loading violations...</div>
+        </div>
+    </div>
+    <script>
+        var API = 'https://cw9irnjwcd.execute-api.us-east-1.amazonaws.com';
+        var allViolations = [];
+        var currentFilter = 'ALL';
+
+        function loadViolations() {
+            document.getElementById('violations-list').innerHTML = '<div class="loading">Loading violations...</div>';
+            document.getElementById('error-container').innerHTML = '';
+            fetch(API + '/violations')
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    allViolations = data.violations || [];
+                    updateStats();
+                    renderViolations();
+                })
+                .catch(function (e) {
+                    document.getElementById('error-container').innerHTML = '<div class="error-msg">Failed to load violations: ' + e.message + '</div>';
+                    document.getElementById('violations-list').innerHTML = '';
+                });
+        }
+
+        function updateStats() {
+            var total = allViolations.length;
+            var high = allViolations.filter(function (v) { return v.severity === 'HIGH'; }).length;
+            var medium = allViolations.filter(function (v) { return v.severity === 'MEDIUM'; }).length;
+            var low = allViolations.filter(function (v) { return v.severity === 'LOW'; }).length;
+            var remediated = allViolations.filter(function (v) { return v.remediation_status === 'REMEDIATED'; }).length;
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-high').textContent = high;
+            document.getElementById('stat-medium').textContent = medium;
+            document.getElementById('stat-low').textContent = low;
+            document.getElementById('stat-remediated').textContent = remediated;
+        }
+
+        function setFilter(filter, btn) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(function (b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            renderViolations();
+        }
+
+        function renderViolations() {
+            var filtered = allViolations;
+            if (currentFilter === 'REMEDIATED') {
+                filtered = allViolations.filter(function (v) { return v.remediation_status === 'REMEDIATED'; });
+            } else if (currentFilter !== 'ALL') {
+                filtered = allViolations.filter(function (v) { return v.severity === currentFilter; });
+            }
+            if (filtered.length === 0) {
+                document.getElementById('violations-list').innerHTML = '<div class="empty">No violations found for this filter.</div>';
+                return;
+            }
+            var html = '';
+            for (var i = 0; i < filtered.length; i++) {
+                var v = filtered[i];
+                html += '<div class="violation-card ' + v.severity + '">';
+                html += '<div class="v-header"><div class="v-rule">' + v.rule_name + '</div>';
+                html += '<div class="v-badges"><span class="badge badge-' + v.severity + '">' + v.severity + '</span>';
+                html += '<span class="badge badge-' + v.remediation_status + '">' + v.remediation_status + '</span></div></div>';
+                html += '<div class="v-resource">Resource: ' + v.resource_id + ' (' + v.resource_type + ')</div>';
+                html += '<div class="v-ai"><div class="v-ai-label">AI Risk Analysis</div>' + v.ai_explanation + '</div>';
+                if (v.remediation_message) {
+                    html += '<div class="remediation-msg">&#10003; ' + v.remediation_message + '</div>';
+                }
+                html += '<div class="v-footer"><span>ID: ' + v.violation_id + '</span>';
+                html += '<span>Region: ' + v.region + '</span>';
+                html += '<span>' + new Date(v.timestamp).toLocaleString() + '</span></div>';
+                html += '</div>';
+            }
+            document.getElementById('violations-list').innerHTML = html;
+        }
+
+        loadViolations();
+    </script>
+</body>
+
+</html>

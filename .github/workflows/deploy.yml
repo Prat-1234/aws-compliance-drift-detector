@@ -1,0 +1,70 @@
+name: Deploy Compliance Drift Detector
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 353625676485.dkr.ecr.us-east-1.amazonaws.com
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::353625676485:role/compliance-drift-github-actions-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Compliance Checker image
+        run: |
+          docker build --provenance=false \
+            -t $ECR_REGISTRY/compliance-drift-compliance-checker:latest \
+            -f Dockerfile .
+          docker push $ECR_REGISTRY/compliance-drift-compliance-checker:latest
+
+      - name: Build and push Auto Remediation image
+        run: |
+          docker build --provenance=false \
+            -t $ECR_REGISTRY/compliance-drift-auto-remediation:latest \
+            -f lambdas/auto_remediation/Dockerfile lambdas/auto_remediation/
+          docker push $ECR_REGISTRY/compliance-drift-auto-remediation:latest
+
+      - name: Build and push API Handler image
+        run: |
+          docker build --provenance=false \
+            -t $ECR_REGISTRY/compliance-drift-api-handler:latest \
+            -f lambdas/api_handler/Dockerfile lambdas/api_handler/
+          docker push $ECR_REGISTRY/compliance-drift-api-handler:latest
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.3.0
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: terraform apply -auto-approve
+
+      - name: Deploy dashboard to S3
+        run: |
+          aws s3 cp dashboard/index.html \
+            s3://compliance-drift-dashboard-353625676485/index.html \
+            --content-type text/html
